@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>使用 Tesseract.js 识别和分段文本</title>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         #preview {
             display: none;
@@ -28,6 +27,7 @@
 <div id="outputText"></div>
 <img id="preview" alt="预览图" />
 
+<canvas id="canvas" style="display:none;"></canvas>
 <script>
     document.getElementById('fileInput').addEventListener('change', (event) => {
         const file = event.target.files[0];
@@ -57,39 +57,65 @@
 
         outputText.innerHTML = "识别中，请稍候...";
 
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
         const file = fileInput.files[0];
-        const formData = new FormData();
-        formData.append('image', file);
-        try {
-            const response = await fetch('<%= serverUrl %>/analyse', {
-                method: 'POST',
-                body: formData
-            });
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = async () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
 
-            if (!response.ok) {
-                throw new Error('网络错误: ' + response.statusText);
+            ctx.drawImage(img, 0, 0);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                data[i] = avg;
+                data[i + 1] = avg;
+                data[i + 2] = avg;
             }
 
-            const data = await response.json();
+            ctx.putImageData(imageData, 0, 0);
 
-            if (data.length === 0) {
-                outputText.innerHTML = "<h3>没有找到匹配的答案 😭</h3>";
-                return
-            }
+            canvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append('image', blob, 'image.png');
 
-            let innerHtml = "<h3>匹配到啦~~~ 🥳</h3>";
+                try {
+                    const response = await fetch('<%= serverUrl %>/analyse', {
+                        method: 'POST',
+                        body: formData
+                    });
 
-            innerHtml += data.map((result, index) => `
-                <h4>问题 ${index + 1}：</h4>
-                <div class="paragraph">${result.question}</div>
-                <h4>答案：</h4>
-                ${result.answers.map(answer => `<div class="paragraph">${answer}</div>`).join("")} `
-            ).join("")
+                    if (!response.ok) {
+                        throw new Error('网络错误: ' + response.statusText);
+                    }
 
-            outputText.innerHTML = innerHtml;
-        } catch (error) {
-            outputText.textContent = "识别失败: " + error.message;
-        }
+                    const data = await response.json();
+
+                    if (data.length === 0) {
+                        outputText.innerHTML = "<h3>没有找到匹配的答案 😭</h3>";
+                        return
+                    }
+
+                    let innerHtml = "<h3>匹配到啦~~~ 🥳</h3>";
+
+                    innerHtml += data.map((result, index) => `
+                        <h4>问题 ${index + 1}：</h4>
+                        <div class="paragraph">${result.question}</div>
+                        <h4>答案：</h4>
+                        ${result.answers.map(answer => `<div class="paragraph">${answer}</div>`).join("")} `
+                    ).join("")
+
+                    outputText.innerHTML = innerHtml;
+                } catch (error) {
+                    outputText.textContent = "识别失败: " + error.message;
+                }
+            }, 'image/png');
+        };
     });
 </script>
 </body>

@@ -44,6 +44,7 @@ app.post("/analyse", upload.single('image'), async (req, res) => {
             .filter(result => result.length > 0)
             .map(R.head())
             .map(R.prop("item"));
+        matchedQuestion = distinctBy("id")(matchedQuestion);
 
         fs.unlink(req.file.path, (err) => {
             if (err) {
@@ -52,8 +53,13 @@ app.post("/analyse", upload.single('image'), async (req, res) => {
                 console.log(`已删除文件: ${req.file.path}`);
             }
         });
+        console.log(JSON.stringify({
+            time: new Date().toISOString(),
+            recognized_strs: text,
+            matchedQuestion
+        }));
 
-        res.json(distinctBy("id")(matchedQuestion));
+        res.json(matchedQuestion);
     } catch (error) {
         console.error(error);
         res.status(500).send({error: '识别失败，错误:' + error.message});
