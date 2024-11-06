@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>使用 Tesseract.js 识别和分段文本</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        #preview {
+            display: none;
+            margin-top: 20px;
+            max-width: 300px;
+        }
+        .paragraph {
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<h1>OCR 小工具</h1>
+
+<input type="file" id="fileInput" accept="image/*" capture="camera">
+<button id="processButton">识别文本</button>
+<div id="outputText"></div>
+<img id="preview" alt="预览图" />
+
+<script>
+    document.getElementById('fileInput').addEventListener('change', function(event) {
+        const file = event.target.files[0];
+
+        if (file) {
+            document.getElementById('outputText').innerHTML = "";
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const preview = document.getElementById('preview');
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+            };
+
+            reader.readAsDataURL(file);
+        }
+    });
+
+    document.getElementById('processButton').addEventListener('click', async () => {
+        const fileInput = document.getElementById('fileInput');
+        const outputText = document.getElementById('outputText');
+
+        if (fileInput.files.length === 0) {
+            outputText.textContent = "请先选择一张图片.";
+            return;
+        }
+
+        const file = fileInput.files[0];
+
+        outputText.innerHTML = "识别中，请稍候...";
+
+        try {
+            const result = await Tesseract.recognize(file, 'chi_sim');
+
+            const paragraphs = result.data.text
+                .split(/\n/)
+                .filter(Boolean)
+                .map(line => line.replace(/\s+/g, ""))
+
+            fetch('http://192.168.124.2:3000/analyse', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(paragraphs)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    outputText.innerHTML = "";
+
+                    if (data.length === 0) {
+                        outputText.innerHTML = "<h3>没有找到匹配的答案 😭</h3>";
+                        return
+                    }
+
+                    let innerHtml = "<h3>匹配到啦~~~ 🥳</h3>";
+
+                    innerHtml += data.map((result, index) => `
+                        <h4>问题 ${index + 1}：</h4>
+                        <div class="paragraph">${result.question}</div>
+                        <h4>答案：</h4>
+                        ${result.answers.map(answer => `<div class="paragraph">${answer}</div>`).join("")} `
+                    ).join("")
+
+                    outputText.innerHTML = innerHtml;
+                })
+                .catch((error) => {
+                    outputText.innerHTML = "识别出错……" + error;
+                });
+        } catch (error) {
+            console.error(error);
+            outputText.textContent = "识别过程中发生错误.";
+        }
+    });
+</script>
+</body>
+</html>
