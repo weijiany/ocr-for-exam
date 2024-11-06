@@ -67,7 +67,7 @@
                 .filter(Boolean)
                 .map(line => line.replace(/\s+/g, ""))
 
-            fetch('http://192.168.124.2:3000/analyse', {
+            fetch('<%= serverUrl %>/analyse', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(paragraphs)

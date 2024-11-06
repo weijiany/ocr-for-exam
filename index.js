@@ -18,11 +18,13 @@ const options = {
 
 const fuse = new Fuse(tarotData, options);
 
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 app.use(express.static('public'));
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'index.html'));
+    res.render('index', { serverUrl: req.protocol + '://' + req.get('host') });
 });
 
 app.post("/analyse", (req, res) => {
