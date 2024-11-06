@@ -28,8 +28,9 @@ app.use(express.static('public'));
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    console.log(req.protocol);
-    res.render('index', { serverUrl: req.protocol + '://' + req.get('host') });
+    res.render('index', {
+        serverUrl: `${process.env.NODE_ENV === 'production' ? "https" : "http"}://${req.get('host')}`
+    });
 });
 
 const upload = multer({ dest: 'uploads/' });
