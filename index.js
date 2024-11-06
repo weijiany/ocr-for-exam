@@ -2,7 +2,11 @@ const Fuse = require('fuse.js');
 const R = require('ramda');
 
 const express = require('express')
+const multer = require('multer');
+const Tesseract = require('tesseract.js');
+const fs = require('fs');
 const path = require("path");
+
 const app = express();
 const port = 3000;
 
@@ -27,13 +31,33 @@ app.get('/', (req, res) => {
     res.render('index', { serverUrl: req.protocol + '://' + req.get('host') });
 });
 
-app.post("/analyse", (req, res) => {
-    let body = req.body;
-    let matchedQuestion = body.map(line => fuse.search(line))
-        .filter(result => result.length > 0)
-        .map(R.head())
-        .map(R.prop("item"));
-    res.json(distinctBy("id")(matchedQuestion));
+const upload = multer({ dest: 'uploads/' });
+app.post("/analyse", upload.single('image'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).send({error: '没有文件被上传'});
+    }
+
+    try {
+        const {data: {text}} = await Tesseract.recognize(req.file.path, 'chi_sim');
+        let matchedQuestion = text.split("\n")
+            .map(line => fuse.search(line.replace(/\s+/g, "")))
+            .filter(result => result.length > 0)
+            .map(R.head())
+            .map(R.prop("item"));
+
+        fs.unlink(req.file.path, (err) => {
+            if (err) {
+                console.error(`删除文件时出错: ${err}`);
+            } else {
+                console.log(`已删除文件: ${req.file.path}`);
+            }
+        });
+
+        res.json(distinctBy("id")(matchedQuestion));
+    } catch (error) {
+        console.error(error);
+        res.status(500).send({error: '识别失败，错误:' + error.message});
+    }
 });
 
 app.listen(port, () => {
