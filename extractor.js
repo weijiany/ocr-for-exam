@@ -147,7 +147,22 @@ const txt = () => {
         .flat();
 }
 
-let data = [
+const distinctByQuestionAndMergeAnswers = R.pipe(
+    R.groupBy(R.prop("question")),
+    R.values(),
+    R.map(items => (
+        {
+            question: items[0].question,
+            answers: R.uniq(items.map(R.prop("answers")).flat())
+        }))
+)
+
+const injectId = (arr) => arr.map((val, index) => ({id: index, ...val}));
+
+let data = R.pipe(
+    distinctByQuestionAndMergeAnswers,
+    injectId
+)([
     ...sheet1(),
     ...sheet2(),
     ...sheet3(),
@@ -156,6 +171,6 @@ let data = [
     ...alertSheet1(),
     ...num2(),
     ...txt(),
-].map((val, index) => ({id: index, ...val}));
+]);
 
 console.log(JSON.stringify(data, null, 2));
