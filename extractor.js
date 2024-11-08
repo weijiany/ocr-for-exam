@@ -1,5 +1,6 @@
 const XLSX = require('xlsx');
 const R = require('ramda');
+const fs = require('fs');
 
 const trimSpaces = R.replace(/\s+/g, "")
 const trimArrSpaces = R.map(R.replace(/\s+/g, ""))
@@ -79,12 +80,82 @@ const latestFileSheet1 = () => {
     )(sheetToJson)
 }
 
+let alertSheet1 = () => {
+    let workBook = XLSX.readFile('./data/星盘弹窗试题 最新.xlsx');
+    let sheet = workBook.Sheets['Sheet1'];
+    let sheetToJson = XLSX.utils.sheet_to_json(sheet);
+    const numToChar = {
+        "1": "A",
+        "2": "B",
+        "3": "C",
+        "4": "D",
+    }
+    return R.pipe(
+        R.map(R.values()),
+        R.map(raw =>
+            ({
+                question: trimSpaces(raw[0]),
+                answers: raw[1].trim().split("\r\n").filter(
+                    item =>
+                        raw[2]
+                            .toString()
+                            .split(/\s*/)
+                            .some(prefix => item.startsWith(numToChar[prefix]))
+                )
+            }))
+    )(sheetToJson);
+};
+
+let num2 = () => {
+    let workBook = XLSX.readFile('./data/题库2号完整版格式.xlsx');
+    let sheet = workBook.Sheets['Sheet1'];
+    let sheetToJson = XLSX.utils.sheet_to_json(sheet);
+    const charToNum = {
+        "A": 1,
+        "B": 2,
+        "C": 3,
+        "D": 4,
+        "E": 5,
+        "F": 6,
+        "G": 7,
+    }
+    return R.pipe(
+        R.map(R.values()),
+        R.map(raw =>
+            ({
+                question: trimSpaces(raw[0]),
+                answers: raw[1].split("").map(option => raw[charToNum[option] + 1])
+            }))
+    )(sheetToJson);
+}
+
+const txt = () => {
+    const readFile = R.pipe(
+        R.filter(R.identity),
+        R.map(line => JSON.parse(line)),
+        R.map(item => ({
+            question: item.q,
+            answers: item.ans.split("")
+                .filter(R.identity)
+                .map(option => option.charCodeAt(0) - 65)
+                .map(option => item.a[option])
+        }))
+    );
+
+    return [1, 2, 3, 4]
+        .map(i => readFile(fs.readFileSync(`./data/${i}.txt`, "utf-8").split("\n")))
+        .flat();
+}
+
 let data = [
     ...sheet1(),
     ...sheet2(),
     ...sheet3(),
     ...sheet4(),
     ...latestFileSheet1(),
+    ...alertSheet1(),
+    ...num2(),
+    ...txt(),
 ].map((val, index) => ({id: index, ...val}));
 
 console.log(JSON.stringify(data, null, 2));
