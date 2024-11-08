@@ -22,13 +22,52 @@
 <body>
 <h1>🤠 塔罗考试 - 给我过 🤠</h1>
 
+<h3>图片识别</h3>
 <input type="file" id="fileInput" accept="image/*" capture="camera">
 <button id="processButton">识别文本</button>
+<br>
+<h3>答案输入</h3>
+<input id="question">
+<button id="answer">获取答案</button>
 <div id="outputText"></div>
 <img id="preview" alt="预览图" />
 
 <canvas id="canvas" style="display:none;"></canvas>
 <script>
+    const dataToHtml = (data) => {
+        if (data.length === 0) {
+            return "<h3>没有找到匹配的答案 😭</h3>";
+        }
+
+        let innerHtml = "<h3>匹配到啦~~~ 🥳</h3>";
+
+        return innerHtml + data.map((result, index) => `
+            <h4>问题 ${index + 1}：</h4>
+            <div class="paragraph">${result.question}</div>
+            <h4>答案：</h4>
+            ${result.answers.map(answer => `<div class="paragraph">${answer}</div>`).join("")} `
+        ).join("");
+    }
+
+    document.getElementById('answer').addEventListener('click', async () => {
+        let question = document.getElementById('question').value;
+        const outputText = document.getElementById('outputText');
+        try {
+            const response = await fetch(`<%= serverUrl %>/answers?question=${question}`, {
+                method: 'GET',
+            });
+
+            if (!response.ok) {
+                throw new Error('网络错误: ' + response.statusText);
+            }
+
+            outputText.innerHTML = dataToHtml(await response.json());
+        } catch (e) {
+            outputText.innerHTML = `error: ${e}`
+        }
+        fetch();
+    });
+
     document.getElementById('fileInput').addEventListener('change', (event) => {
         const file = event.target.files[0];
 
@@ -94,23 +133,7 @@
                         throw new Error('网络错误: ' + response.statusText);
                     }
 
-                    const data = await response.json();
-
-                    if (data.length === 0) {
-                        outputText.innerHTML = "<h3>没有找到匹配的答案 😭</h3>";
-                        return
-                    }
-
-                    let innerHtml = "<h3>匹配到啦~~~ 🥳</h3>";
-
-                    innerHtml += data.map((result, index) => `
-                        <h4>问题 ${index + 1}：</h4>
-                        <div class="paragraph">${result.question}</div>
-                        <h4>答案：</h4>
-                        ${result.answers.map(answer => `<div class="paragraph">${answer}</div>`).join("")} `
-                    ).join("")
-
-                    outputText.innerHTML = innerHtml;
+                    outputText.innerHTML = dataToHtml(await response.json());
                 } catch (error) {
                     outputText.textContent = "识别失败: " + error.message;
                 }

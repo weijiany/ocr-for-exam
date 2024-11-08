@@ -17,7 +17,7 @@ const distinctBy = prop => R.uniqBy(R.prop(prop))
 const options = {
     keys: ['question'],
     includeScore: true,
-    threshold: 0.2,
+    threshold: 0.1,
 };
 
 const fuse = new Fuse(tarotData, options);
@@ -66,6 +66,12 @@ app.post("/analyse", upload.single('image'), async (req, res) => {
         console.error(error);
         res.status(500).send({error: '识别失败，错误:' + error.message});
     }
+});
+
+app.get('/answers', (req, res) => {
+    let result = fuse.search(req.query.question);
+    res.json(R.map(R.prop("item"))(result));
+
 });
 
 app.listen(port, () => {
