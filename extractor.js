@@ -1,4 +1,5 @@
 const XLSX = require('xlsx');
+const mammoth = require('mammoth');
 const R = require('ramda');
 const fs = require('fs');
 
@@ -145,7 +146,58 @@ const txt = (fileNames) => {
     return fileNames
         .map(i => readFile(fs.readFileSync(`./data/${i}.txt`, "utf-8").split("\n")))
         .flat();
-}
+};
+
+const groupBasedOnKeyWord = (array, condition) => {
+    let indexes = array
+        .map((s, index) => ({s, index}))
+        .filter(({s}) => condition(s))
+        .map(R.prop("index"));
+    return R.range(0, indexes.length - 1)
+        .map(i => array.slice(indexes[i], indexes[i + 1]))
+};
+
+const astrolabe001 = async () => {
+    let content = fs.readFileSync("./data/星盘001.txt", "utf-8")
+    let data = content.split("\r");
+    return groupBasedOnKeyWord(data, s => s === "")
+        .filter(item => item.length > 1)
+        .map(group => {
+            group = group.slice(1);
+            let questionAndAnswerOptions = group[0];
+            let index = R.findLastIndex(R.test(/[^1234\s]/g))(questionAndAnswerOptions.split(""));
+            let question = questionAndAnswerOptions.slice(0, index + 1);
+            if (group.length === 2) {
+                return {
+                    question,
+                    answers: group[1]
+                }
+            }
+
+            let options = questionAndAnswerOptions.slice(index + 1).split(/\s*/g).filter(R.identity);
+            return {
+                question,
+                answers: options.map(option => group[option])
+            }
+        })
+};
+
+const astrolabe002 = async () => {
+    let {value: content} = await mammoth.extractRawText({path: "./data/星盘002.docx"});
+    let data = content
+        .split(/[\n\t]/)
+        .filter(R.identity);
+
+    return groupBasedOnKeyWord(data, R.includes("(   )"))
+        .flatMap(group => {
+            let questionTemplate = group[0];
+            let answers = groupBasedOnKeyWord(group.slice(1), R.includes("："));
+            return answers.map(answer => ({
+                question: questionTemplate.replace("(   )", answer[0].replace("：", "")),
+                answers: answer.slice(1)
+            }))
+        });
+};
 
 const distinctByQuestionAndMergeAnswers = R.pipe(
     R.groupBy(R.prop("question")),
@@ -155,22 +207,29 @@ const distinctByQuestionAndMergeAnswers = R.pipe(
             question: items[0].question,
             answers: R.uniq(items.map(R.prop("answers")).flat())
         }))
-)
+);
 
 const injectId = (arr) => arr.map((val, index) => ({id: index, ...val}));
 
-let data = R.pipe(
-    distinctByQuestionAndMergeAnswers,
-    injectId
-)([
-    ...sheet1(),
-    ...sheet2(),
-    ...sheet3(),
-    ...sheet4(),
-    ...latestFileSheet1(),
-    ...alertSheet1(),
-    ...num2(),
-    ...txt([1, 2, 3, 4, "星盘"]),
-]);
+const main = async () => {
+    let data = R.pipe(
+        distinctByQuestionAndMergeAnswers,
+        injectId
+    )([
+        // ...sheet1(),
+        // ...sheet2(),
+        // ...sheet3(),
+        // ...sheet4(),
+        ...latestFileSheet1(),
+        ...alertSheet1(),
+        // ...num2(),
+        // ...txt([1, 2, 3, 4, "星盘"]),
+        ...txt(["星盘"]),
+        ...(await astrolabe001()),
+        ...(await astrolabe002()),
+    ]);
 
-console.log(JSON.stringify(data, null, 2));
+    console.log(JSON.stringify(data, null, 2));
+}
+
+main();
