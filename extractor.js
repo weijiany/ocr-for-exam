@@ -129,7 +129,7 @@ let num2 = () => {
     )(sheetToJson);
 }
 
-const txt = () => {
+const txt = (fileNames) => {
     const readFile = R.pipe(
         R.filter(R.identity),
         R.map(line => JSON.parse(line)),
@@ -142,7 +142,7 @@ const txt = () => {
         }))
     );
 
-    return [1, 2, 3, 4]
+    return fileNames
         .map(i => readFile(fs.readFileSync(`./data/${i}.txt`, "utf-8").split("\n")))
         .flat();
 }
@@ -170,7 +170,7 @@ let data = R.pipe(
     ...latestFileSheet1(),
     ...alertSheet1(),
     ...num2(),
-    ...txt(),
+    ...txt([1, 2, 3, 4, "星盘"]),
 ]);
 
 console.log(JSON.stringify(data, null, 2));
