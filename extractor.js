@@ -170,7 +170,7 @@ const astrolabe001 = async () => {
             if (group.length === 2) {
                 return {
                     question,
-                    answers: group[1]
+                    answers: [group[1]]
                 }
             }
 
@@ -199,6 +199,34 @@ const astrolabe002 = async () => {
         });
 };
 
+const jacaranda = () => {
+    let workBook = XLSX.readFile('./data/紫薇初级最新版本.xlsx', {
+        cellHTML: true
+    });
+    let sheet = workBook.Sheets['Sheet1'];
+    let data = XLSX.utils.sheet_to_json(sheet, {
+        header: true,
+        raw: true
+    });
+
+    return R.pipe(
+        R.reduce((acc, item) => {
+            if (item.Q) {
+                acc.push([item]);
+            } else {
+                acc[acc.length - 1].push(item);
+            }
+            return acc;
+        }, []),
+        R.map(group => ({
+            question: group[0].Q,
+            answers: group.length === 1
+                ? [group[0].A]
+                : group.map(R.prop('A')).filter(R.includes('~~')).map(R.replace('~~', ''))
+        }))
+    )(data);
+}
+
 const distinctByQuestionAndMergeAnswers = R.pipe(
     R.groupBy(R.prop("question")),
     R.values(),
@@ -211,24 +239,49 @@ const distinctByQuestionAndMergeAnswers = R.pipe(
 
 const injectId = (arr) => arr.map((val, index) => ({id: index, ...val}));
 
+const writeToXLSX = data => {
+    let tmpData = data.map(item => ({
+        ...item,
+        ...{answers: item.answers.join('\n')}
+    }));
+    let sheet = XLSX.utils.json_to_sheet(tmpData);
+    const maxWidth = R.pipe(
+        R.map(R.pipe(
+            R.toPairs,
+            R.map(([_, value]) => typeof value === 'string' ? value.length : 3)
+        )),
+        R.apply(R.zipWith(R.max)),
+        R.map(length => length * 24)
+    );
+
+    sheet['!cols'] = maxWidth(tmpData).map(width => ({ wpx: width }));
+    sheet['!rows'] = data.map(R.prop('answers')).map(R.length).map(height => ({hpx: height * 15}))
+    let workBook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workBook, sheet);
+    XLSX.writeFile(workBook, "题库.xlsx")
+};
+
 const main = async () => {
     let data = R.pipe(
-        distinctByQuestionAndMergeAnswers,
+        // distinctByQuestionAndMergeAnswers,
+        R.sortBy(R.prop('question')),
         injectId
     )([
-        // ...sheet1(),
-        // ...sheet2(),
-        // ...sheet3(),
-        // ...sheet4(),
+        ...sheet1(),
+        ...sheet2(),
+        ...sheet3(),
+        ...sheet4(),
         ...latestFileSheet1(),
         ...alertSheet1(),
-        // ...num2(),
-        // ...txt([1, 2, 3, 4, "星盘"]),
+        ...num2(),
+        ...txt([1, 2, 3, 4, "星盘"]),
         ...txt(["星盘"]),
         ...(await astrolabe001()),
         ...(await astrolabe002()),
+        ...jacaranda(),
     ]);
 
+    writeToXLSX(data);
     console.log(JSON.stringify(data, null, 2));
 }
 
